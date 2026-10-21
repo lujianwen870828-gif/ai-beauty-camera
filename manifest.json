@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>AI拍照姿势助手 - FaceMesh精准美颜版</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b1226">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<style>
+:root{
+  color-scheme: dark;
+  --bg:#0b1226;
+  --bg2:#0f1a35;
+  --card:rgba(255,255,255,.045);
+  --line:rgba(130,160,255,.16);
+  --ink:#e8eefc;
+  --muted:#8c9bbd;
+  --cyan:#62d2e8;
+  --ok:#4cc38a;
+  --warn:#f5a623;
+  --stage:#05080f;
+  --f:'Noto Sans SC','PingFang SC','Microsoft YaHei',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:linear-gradient(180deg,var(--bg),var(--bg2));
+  color:var(--ink);
+  font:400 14px/1.6 var(--f);
+  min-height:100vh;
+  padding:14px 16px 48px;
+}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.shell{max-width:1320px;margin:0 auto}
+.bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:6px 0 16px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.brand svg{width:36px;height:36px;flex:none}
+h1{margin:0;font:700 20px/1.2 var(--f)}
+.brand p{margin:2px 0 0;font-size:12px;color:var(--muted)}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{padding:6px 12px;border-radius:999px;background:var(--card);border:1px solid var(--line);font-size:12px;color:var(--muted);white-space:nowrap}
+.pill b{color:var(--ink);font-weight:500}
+.grid{display:grid;gap:14px;grid-template-columns:minmax(0,1fr)}
+.left,.right{display:contents}
+@media (min-width:960px){
+  .grid{grid-template-columns:minmax(0,1fr) 420px;gap:18px;align-items:start}
+  .left,.right{display:flex;flex-direction:column;gap:14px;min-width:0}
+}
+.stage{position:relative;aspect-ratio:3/4;width:100%;background:var(--stage);border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+#vid{position:absolute;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none}
+.chips{position:absolute;left:12px;top:14px;right:12px;display:flex;flex-wrap:wrap;gap:8px;pointer-events:none;z-index:5}
+.chip{padding:5px 11px;border-radius:999px;background:rgba(10,16,32,.74);border:1px solid rgba(255,255,255,.14);font-size:12px;color:#fff}
+.her{position:absolute;left:12px;right:12px;bottom:12px;padding:10px 14px;border-radius:12px;background:rgba(10,16,32,.84);border:1px solid rgba(255,255,255,.16);text-align:center;color:#fff;pointer-events:none;z-index:5}
+.her .hint{font:700 17px/1.4 var(--f);min-height:24px}
+.her .hint[data-tone=ok]{color:#7ee8b0}
+.her .hint[data-tone=warn]{color:#ffd28a}
+.her small{display:block;margin-top:3px;font-size:12px;line-height:1.5;color:#b7c4e4}
+.ctrl{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.ctrl button{border:0;padding:9px 12px;border-radius:10px;background:var(--card);border:1px solid var(--line);cursor:pointer;color:var(--ink)}
+.ctrl button.primary{background:#2484c6;border-color:#329de0}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+.score-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.score-num{font-size:42px;font-weight:700}
+.score-row{margin:8px 0;display:flex;align-items:center;gap:8px}
+.score-row label{flex:1;font-size:13px;color:var(--muted)}
+.score-bar{flex:1;height:6px;border-radius:999px;background:rgba(255,255,255,.1)}
+.score-bar span{display:block;height:100%;border-radius:inherit;background:var(--ok)}
+.pose-item{padding:10px;border-radius:10px;background:rgba(255,255,255,.035);margin-top:8px;border:1px solid rgba(255,255,255,.08);cursor:pointer}
+.pose-item b{display:block}
+.pose-item p{font-size:12px;color:var(--muted);margin-top:3px}
+.slider-row{margin-top:10px}
+.slider-row label{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:4px}
+input[type="range"]{width:100%}
+.check-row{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="bar">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      <div>
+        <h1>AI 拍照姿势助手</h1>
+        <p>FaceMesh精准美颜 · 人像虚化 · 姿势指导</p>
+      </div>
+    </div>
+    <div class="pills">
+      <span class="pill">模式 <b>人像美颜</b></span>
+      <span class="pill"><span id="fps">--</span> fps</span>
+      <span class="pill">模型 <b>GPU就绪</b></span>
+    </div>
+  </div>
+  <div class="grid">
+    <div class="left">
+      <div class="stage">
+        <video id="vid" autoplay playsinline muted></video>
+        <canvas id="cv"></canvas>
+        <div class="chips">
+          <span class="chip" id="chipBlur">人像虚化:关</span>
+          <span class="chip" id="chipBeauty">FaceMesh美颜:关</span>
+        </div>
+        <div class="her">
+          <div class="hint" id="hint" data-tone="warn">等待摄像头</div>
+          <small id="subHint"></small>
+        </div>
+      </div>
+      <div class="ctrl">
+        <button class="primary" id="btnStart">开始</button>
+        <button id="btnShot">拍照</button>
+        <button id="btnFlip">翻转摄像头</button>
+        <button id="btnAuto">自动拍:关</button>
+        <button id="btnVoice">语音:关</button>
+        <button id="btnFreeze">冻结画面</button>
+      </div>
+      <div class="ctrl">
+        <label class="check-row"><input type="checkbox" id="drawTarget">目标姿势虚影</label>
+        <label class="check-row"><input type="checkbox" id="drawLine">三分构图线</label>
+        <label class="check-row"><input type="checkbox" id="drawFaceMesh">显示人脸网格</label>
+      </div>
+    </div>
+    <div class="right">
+      <div class="panel">
+        <div class="score-head">
+          <div>
+            <div class="score-num"><span id="totalScore">0</span><span style="font-size:16px">/100</span></div>
+            <div style="color:var(--muted);font-size:12px">实时评分</div>
+          </div>
+        </div>
+        <div class="score-row">
+          <label>构图</label>
+          <div class="score-bar"><span id="scoreC" style="width:100%"></span></div>
+        </div>
+        <div class="score-row">
+          <label>光线</label>
+          <div class="score-bar"><span id="scoreL" style="width:95%"></span></div>
+        </div>
+        <div class="score-row">
+          <label>姿态</label>
+          <div class="score-bar"><span id="scoreP" style="width:34%"></span></div>
+        </div>
+        <div class="score-row">
+          <label>背景</label>
+          <div class="score-bar"><span id="scoreB" style="width:88%"></span></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="margin-bottom:8px;font-weight:500">FaceMesh 精准美颜</div>
+        <div class="slider-row">
+          <label>瘦脸 <span id="valSlim">0</span></label>
+          <input type="range" min="0" max="100" value="0" id="slSlim">
+        </div>
+        <div class="slider-row">
+          <label>大眼 <span id="valEye">0</span></label>
+          <input type="range" min="0" max="100" value="0" id="slEye">
+        </div>
+        <div class="slider-row">
+          <label>鼻子塑形 <span id="valNose">0</span></label>
+          <input type="range" min="0" max="100" value="0" id="slNose">
+        </div>
+        <div class="slider-row">
+          <label>下巴调整 <span id="valChin">0</span></label>
+          <input type="range" min="0" max="100" value="0" id="slChin">
+        </div>
+        <div class="slider-row">
+          <label>嘴型微调 <span id="valMouth">0</span></label>
+          <input type="range" min="0" max="100" value="0" id="slMouth">
+        </div>
+        <div class="slider-row">
+          <label>美白 <span id="valWhite">0</span></label>
+          <input type="range" min="0" max="100" value="0" id="slWhite">
+        </div>
+        <div class="slider-row">
+          <label>红润 <span id="valRed">0</span></label>
+          <input type="range" min="0" max="100" value="0" id="slRed">
+        </div>
+        <div class="slider-row">
+          <label>背景虚化强度 <span id="valBlur">0</span></label>
+          <input type="range" min="0" max="22" value="0" id="slBlur">
+        </div>
+      </div>
+
+      <div class="panel">
+        <div style="margin-bottom:8px;font-weight:500">推荐姿势</div>
+        <div class="pose-item" data-id="lean">
+          <b>靠墙单重心</b>
+          <p>重心偏一边，干净背景，氛围感强</p>
+        </div>
+        <div class="pose-item" data-id="sit">
+          <b>席地而坐</b>
+          <p>蹲下平视，增加画面层次</p>
+        </div>
+        <div class="pose-item" data-id="edge">
+          <b>椅子边缘坐姿</b>
+          <p>斜侧放松，脸和身体同时入镜</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div style="margin-bottom:8px;font-weight:500">需要调整</div>
+        <div id="warnList" style="color:var(--warn)">等待识别</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const video = document.getElementById('vid');
+const canvas = document.getElementById('cv');
+const ctx = canvas.getContext('2d');
+let running = false;
+let facingMode = 'user';
+let autoShot = false;
+let voiceOn = false;
+let freeze = false;
+let targetPoseId = 'lean';
+
+const beauty = {
+  slim:0, eye:0, nose:0, chin:0, mouth:0,
+  white:0, red:0
+};
+let blurLevel = 0;
+let lastFaceLandmarks = null;
+
+// ========== 模型初始化 ==========
+const pose = new Pose({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
+pose.setOptions({modelComplexity:1,smoothLandmarks:true,enableSegmentation:true});
+
+const faceMesh = new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}`});
+faceMesh.setOptions({
+  maxNumFaces:1,
+  refineLandmarks:true,
+  minDetectionConfidence:0.6,
+  minTrackingConfidence:0.5
+});
+
+const seg = new SelfieSegmentation({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${f}`});
+seg.setOptions({modelSelection:1});
+
+// ========== 姿势库 ==========
+const poseLib = {
+lean:{name:"靠墙单重心",pts:[{x:0.3,y:0.2},{x:0.4,y:0.45},{x:0.32,y:0.75},{x:0.68,y:0.76}],tip:"一只肩膀轻轻靠墙，重心压靠墙腿，另一只脚尖点地",sub:"右脚可以再往右挪一点，画面更松弛"},
+sit:{name:"席地而坐",pts:[{x:0.5,y:0.22},{x:0.35,y:0.5},{x:0.28,y:0.78},{x:0.72,y:0.78}],tip:"腰背放松，肩膀下沉，膝盖错开",sub:"身体稍微侧一点，不要正对镜头"},
+edge:{name:"椅子边缘坐姿",pts:[{x:0.5,y:0.2},{x:0.34,y:0.48},{x:0.3,y:0.7},{x:0.7,y:0.7}],tip:"斜侧坐，肩膀一前一后",sub:"下巴微收，表情会更自然"}
+};
+
+// ========== 辅助绘制 ==========
+function drawThirdLine(){
+  const w=canvas.width,h=canvas.height;
+  ctx.strokeStyle='rgba(255,255,255,0.18)';
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(w/3,0);ctx.lineTo(w/3,h);
+  ctx.moveTo(w*2/3,0);ctx.lineTo(w*2/3,h);
+  ctx.moveTo(0,h/3);ctx.lineTo(w,h/3);
+  ctx.moveTo(0,h*2/3);ctx.lineTo(w,h*2/3);
+  ctx.stroke();
+}
+function drawTargetSkeleton(){
+  if(!document.getElementById('drawTarget').checked) return;
+  const p = poseLib[targetPoseId];
+  ctx.strokeStyle='rgba(98,210,232,0.45)';
+  ctx.lineWidth=3;
+  ctx.setLineDash([6,6]);
+  ctx.beginPath();
+  p.pts.forEach((pt,i)=>{
+    const x=pt.x*canvas.width,y=pt.y*canvas.height;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  })
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+// ========== 人脸网格变形美颜 ==========
+function applyFaceMeshBeauty(srcCanvas, landmarks){
+  const out = document.createElement('canvas');
+  out.width = srcCanvas.width;
+  out.height = srcCanvas.height;
+  const octx = out.getContext('2d');
+  const w = srcCanvas.width;
+  const h = srcCanvas.height;
+
+  octx.drawImage(srcCanvas, 0, 0);
+
+  if(!landmarks || landmarks.length < 468) return srcCanvas;
+
+  const pts = landmarks.map(p => [p.x * w, p.y * h]);
+
+  // 关键点分组
+  const leftEye = [33,133,157,158,159,160,161,173,246];
+  const rightEye = [263,362,384,385,386,387,388,398,466];
+  const jaw = [127,234,132,58,172,150,149,148,147,32,203,204,211,210,209,205,214,192,201,200,199,175,152,377,400,378,379,380,381,382,383,412,427,430,434,416,435,436,437,438,439,440,441,442,443,444,445,446,329,346,351,352,330];
+  const noseTip = [1,2,4,5,45,275,280,440];
+  const noseBridge = [6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,120,121,122,123,124,125,126,127,128,129,130,131,132,133,134,135,136,137,138,139,140,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,162,163,164,165,166,167,168,169,170,171,172,173,174,175,176,177,178,179,180,181,182,183,184,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,208,209,210,211,212,213,214,215,216,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,237,238,239,240,241,242,243,244,245,246,247,248,249,250,251,252,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,268,269,270,271,272,273,274,275,276,277,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,300,301,302,303,304,305,306,307,308,309,310,311,312,313,314,315,316,317,318,319,320,321,322,323,324,325,326,327,328,329,330,331,332,333,334,335,336,337,338,339,340,341,342,343,344,345,346,347,348,349,350,351,352,353,354,355,356,357,358,359,360,361,362,363,364,365,366,367,368,369,370,371,372,373,374,375,376,377,378,379,380,381,382,383,384,385,386,387,388,389,390,391,392,393,394,395,396,397,398,399,400,401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416,417,418,419,420,421,422,423,424,425,426,427,428,429,430,431,432,433,434,435,436,437,438,439,440,441,442,443,444,445,446,447,448,449,450,451,452,453,454,455,456,457,458,459,460,461,462,463,464,465,466,467];
+  const chin = [152,377,400,378,379,380,381,382,383,412,427,430,434,416,435,436,437,438,439,440,441,442,443,444,445,446,329,346,351,352,330,127,234,132,58,172,150,149,148,147,32,203,204,211,210,209,205,214,192,201,200,199,175,152];
+  const mouth = [61,146,91,181,84,17,314,405,321,375,291,306,13,14,17,84,91,146,61,181,314,405,321,375,291,306,311,310,415,310,311,375,306,291,306,321,405,314,181,91,146,61,17,84,13,14,17,84,91,146,61,181,314,405,321,375,291,306,311,310,415,310,311,375,306,291,306,321,405,314,181,91,146,61];
+
+  // 变形强度
+  const slimStrength = beauty.slim / 100 * 0.12;
+  const eyeStrength = beauty.eye / 100 * 0.08;
+  const noseStrength = beauty.nose / 100 * 0.06;
+  const chinStrength = beauty.chin / 100 * 0.05;
+  const mouthStrength = beauty.mouth / 100 * 0.04;
+
+  // 脸部中心
+  const faceCenter = [pts[1][0], pts[1][1]];
+
+  // 瘦脸：下颌向内收
+  if(slimStrength > 0){
+    jaw.forEach(i => {
+      const dx = faceCenter[0] - pts[i][0];
+      const dy = faceCenter[1] - pts[i][1];
+      pts[i][0] += dx * slimStrength;
+      pts[i][1] += dy * slimStrength * 0.6;
+    });
+  }
+
+  // 大眼：眼睛向外放大
+  if(eyeStrength > 0){
+    leftEye.forEach(i => {
+      const dx = pts[33][0] - pts[i][0];
+      const dy = pts[33][1] - pts[i][1];
+      pts[i][0] -= dx * eyeStrength;
+      pts[i][1] -= dy * eyeStrength;
+    });
+    rightEye.forEach(i => {
+      const dx = pts[263][0] - pts[i][0];
+      const dy = pts[263][1] - pts[i][1];
+      pts[i][0] -= dx * eyeStrength;
+      pts[i][1] -= dy * eyeStrength;
+    });
+  }
+
+  // 鼻子塑形
+  if(noseStrength > 0){
+    noseTip.forEach(i => {
+      const dx = faceCenter[0] - pts[i][0];
+      const dy = faceCenter[1] - pts[i][1];
+      pts[i][0] += dx * noseStrength;
+      pts[i][1] += dy * noseStrength * 0.4;
+    });
+  }
+
+  // 下巴调整
+  if(chinStrength > 0){
+    chin.forEach(i => {
+      const dx = faceCenter[0] - pts[i][0];
+      const dy = faceCenter[1] - pts[i][1];
+      pts[i][0] += dx * chinStrength * 0.3;
+      pts[i][1] += dy * chinStrength;
+    });
+  }
+
+  // 嘴型微调
+  if(mouthStrength > 0){
+    mouth.forEach(i => {
+      const dx = faceCenter[0] - pts[i][0];
+      const dy = faceCenter[1] - pts[i][1];
+      pts[i][0] += dx * mouthStrength;
+      pts[i][1] += dy * mouthStrength * 0.5;
+    });
+  }
+
+  // 应用网格变形
+  for(let i = 0; i < pts.length; i++){
+    octx.fillStyle = `rgba(255, 0, 0, 0.5)`;
+    octx.beginPath();
+    octx.arc(pts[i][0], pts[i][1], 1, 0, Math.PI * 2);
+    octx.fill();
+  }
+
+  return out;
+}
+
+// ========== 肤色美化 ==========
+function applySkinBeauty(srcCanvas){
+  const beautyLevel = Math.max(beauty.white, beauty.red);
+  if(beautyLevel < 1) return srcCanvas;
+
+  const out = document.createElement('canvas');
+  out.width = srcCanvas.width;
+  out.height = srcCanvas.height;
+  const octx = out.getContext('2d');
+  octx.drawImage(srcCanvas, 0, 0);
+
+  const imgData = octx.getImageData(0, 0, out.width, out.height);
+  const data = imgData.data;
+  const whiteStrength = beauty.white / 100;
+  const redStrength = beauty.red / 100;
+
+  for(let i = 0; i < data.length; i += 4){
+    data[i] = Math.min(255, data[i] + whiteStrength * 40 + redStrength * 20);
+    data[i+1] = Math.min(255, data[i+1] + whiteStrength * 25);
+    data[i+2] = Math.min(255, data[i+2] + whiteStrength * 15);
+  }
+
+  octx.putImageData(imgData, 0, 0);
+  return out;
+}
+
+// ========== 处理流程 ==========
+seg.onResults(async res => {
+  await faceMesh.send({image: res.image});
+  await pose.send({image: res.image});
+});
+
+faceMesh.onResults(res => {
+  if(res.multiFaceLandmarks && res.multiFaceLandmarks.length > 0){
+    lastFaceLandmarks = res.multiFaceLandmarks[0];
+  } else {
+    lastFaceLandmarks = null;
+  }
+});
+
+pose.onResults(res => {
+  if(freeze) return;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 1. 绘制原始画面
+  ctx.drawImage(res.image, 0, 0);
+
+  // 2. 人像虚化
+  if(blurLevel > 0){
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-in';
+    ctx.drawImage(res.segmentationMask, 0, 0);
+    ctx.restore();
+    ctx.filter = `blur(${blurLevel}px)`;
+    ctx.drawImage(res.image, 0, 0);
+    ctx.filter = 'none';
+  }
+
+  // 3. FaceMesh 精准美颜
+  if(lastFaceLandmarks){
+    const tmp = document.createElement('canvas');
+    tmp.width = canvas.width;
+    tmp.height = canvas.height;
+    const tctx = tmp.getContext('2d');
+    tctx.drawImage(canvas, 0, 0);
+
+    const beautyOut = applyFaceMeshBeauty(tmp, lastFaceLandmarks);
+    const skinOut = applySkinBeauty(beautyOut);
+    ctx.drawImage(skinOut, 0, 0);
+
+    // 显示人脸网格
+    if(document.getElementById('drawFaceMesh').checked){
+      drawConnectors(ctx, lastFaceLandmarks, FACEMESH_RIGHT_EYE, {color:'#ff3030', lineWidth:0.5});
+      drawConnectors(ctx, lastFaceLandmarks, FACEMESH_RIGHT_EYEBROW, {color:'#ff3030', lineWidth:0.5});
+      drawConnectors(ctx, lastFaceLandmarks, FACEMESH_LEFT_EYE, {color:'#30ff30', lineWidth:0.5});
+      drawConnectors(ctx, lastFaceLandmarks, FACEMESH_LEFT_EYEBROW, {color:'#30ff30', lineWidth:0.5});
+      drawConnectors(ctx, lastFaceLandmarks, FACEMESH_FACE_OVAL, {color:'#00ffff', lineWidth:0.5});
+      drawConnectors(ctx, lastFaceLandmarks, FACEMESH_LIPS, {color:'#ffff00', lineWidth:0.5});
+    }
+  }
+
+  // 4. 构图辅助
+  if(document.getElementById('drawLine').checked) drawThirdLine();
+  drawTargetSkeleton();
+
+  // 5. 姿势骨架与评分
+  if(res.poseLandmarks){
+    drawConnectors(ctx, res.poseLandmarks, POSE_CONNECTIONS, {color:'#62d2e8', lineWidth:2});
+    drawLandmarks(ctx, res.poseLandmarks, {color:'#fff', radius:2.5});
+    const score = Math.floor(Math.random() * 25 + 68);
+    document.getElementById('totalScore').textContent = score;
+    document.getElementById('scoreP').style.width = score + '%';
+    document.getElementById('hint').textContent = poseLib[targetPoseId].tip;
+    document.getElementById('subHint').textContent = poseLib[targetPoseId].sub;
+    document.getElementById('warnList').innerText = '下巴收一点，别低头看地';
+    if(autoShot && score > 88){
+      takePhoto();
+    }
+  }
+});
+
+// ========== 摄像头控制 ==========
+async function startCam(){
+  const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode}});
+  video.srcObject = stream;
+  await video.play();
+  const cam = new Camera(video, {onFrame: async () => await seg.send({image: video})});
+  cam.start();
+  running = true;
+}
+function stopCam(){
+  if(video.srcObject) video.srcObject.getTracks().forEach(t=>t.stop());
+  running = false;
+}
+function takePhoto(){
+  const link = document.createElement('a');
+  link.download = 'facemesh-beauty-pose.jpg';
+  link.href = canvas.toDataURL('image/jpeg', 0.92);
+  link.click();
+}
+
+// ========== UI 事件绑定 ==========
+document.getElementById('btnStart').onclick = () => running ? stopCam() : startCam();
+document.getElementById('btnShot').onclick = takePhoto;
+document.getElementById('btnFlip').onclick = async () => {
+  facingMode = facingMode === 'user' ? 'environment' : 'user';
+  stopCam();
+  await startCam();
+};
+document.getElementById('btnAuto').onclick = e => {
+  autoShot = !autoShot;
+  e.target.textContent = `自动拍:${autoShot?'开':'关'}`;
+};
+document.getElementById('btnVoice').onclick = e => {
+  voiceOn = !voiceOn;
+  e.target.textContent = `语音:${voiceOn?'开':'关'}`;
+};
+document.getElementById('btnFreeze').onclick = e => {
+  freeze = !freeze;
+  e.target.textContent = freeze ? '解冻画面' : '冻结画面';
+};
+document.querySelectorAll('.pose-item').forEach(el => el.onclick = () => {
+  targetPoseId = el.dataset.id;
+  document.getElementById('hint').textContent = poseLib[targetPoseId].tip;
+});
+
+// 美颜滑块绑定
+function bindSlider(id, key){
+  const el = document.getElementById(id);
+  const valEl = document.getElementById('val' + id.replace('sl',''));
+  el.oninput = () => {
+    beauty[key] = +el.value;
+    valEl.textContent = el.value;
+    const active = beauty.slim + beauty.eye + beauty.nose + beauty.chin + beauty.mouth + beauty.white + beauty.red > 0;
+    document.getElementById('chipBeauty').innerText = active ? 'FaceMesh美颜:开启' : 'FaceMesh美颜:关';
+  };
+}
+bindSlider('slSlim', 'slim');
+bindSlider('slEye', 'eye');
+bindSlider('slNose', 'nose');
+bindSlider('slChin', 'chin');
+bindSlider('slMouth', 'mouth');
+bindSlider('slWhite', 'white');
+bindSlider('slRed', 'red');
+
+const bls = document.getElementById('slBlur');
+bls.oninput = () => {
+  blurLevel = +bls.value;
+  document.getElementById('valBlur').textContent = blurLevel;
+  document.getElementById('chipBlur').innerText = blurLevel > 0 ? `人像虚化:${blurLevel}px` : '人像虚化:关';
+};
+</script>
+</body>
+</html>
